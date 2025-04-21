@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh" data-lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>银行回单查询工具</title>
+  <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cbe-color: #800080;
+      --boa-color: #f2ad14;
+      --bg-light: #f5f5f5;
+      --card-bg: #ffffff;
+      --text-dark: #333333;
+      --input-bg: #fafafa;
+      --border-color: #e0e0e0;
+      --shadow-light: rgba(0, 0, 0, 0.1);
+      --batch-btn-color: #4a90e2;
+      --active-color: #4a90e2; /* Blue for active states */
+      --input-focus-color: #ffcc00; /* Yellow for input border when focused */
+      --batch-focus-color: #4a90e2; /* Blue for batch query button focus */
+      --batch-select-focus-color: #4a90e2; /* Blue for select focus */
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-light);
+      color: var(--text-dark);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px var(--shadow-light);
+      width: 100%; max-width: 480px;
+      overflow: hidden;
+      position: relative;
+    }
+    .lang-switcher {
+      position: absolute; top: 1rem; right: 1rem;
+      display: flex; gap: 0.5rem;
+    }
+    .lang-btn {
+      background: transparent; border: 1px solid var(--border-color);
+      color: var(--text-dark); padding: 0.25rem 0.5rem;
+      border-radius: 4px; cursor: pointer;
+      transition: background 0.2s;
+      font-size: 0.85rem;
+    }
+    .lang-btn.active, .lang-btn:hover {
+      background: var(--border-color);
+    }
+    .tabs {
+      display: flex; border-bottom: 1px solid var(--border-color);
+      margin-top: 3rem;
+    }
+    .tab {
+      flex: 1; text-align: center; padding: 1rem;
+      cursor: pointer; position: relative;
+      font-weight: 500;
+      color: var(--text-dark);
+      transition: color 0.2s;
+    }
+    .tab.active {
+      color: var(--cbe-color);
+    }
+    .tab[data-bank="boa"].active {
+      color: var(--boa-color);
+    }
+    .tab.active::after {
+      content: '';
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 50px; height: 3px;
+      background: currentColor;
+      border-radius: 2px;
+    }
+    .section { display: none; padding: 2rem; }
+    .section.active { display: block; }
+    .input-group { margin-bottom: 1rem; }
+    .input-group label {
+      display: block; margin-bottom: 0.5rem;
+      font-size: 0.9rem; font-weight: 500;
+    }
+    .input-group input,
+    .input-group textarea,
+    .input-group select {
+      width: 100%; padding: 0.75rem;
+      background: var(--input-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-dark);
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    .input-group input:focus,
+    .input-group textarea:focus,
+    .input-group select:focus {
+      outline: none;
+      border-color: var(--input-focus-color); /* Yellow on focus for CBE */
+    }
+
+    /* For CBE Focus */
+    #cbe-ref:focus, #cbe-digits:focus {
+      border-color: var(--cbe-color);
+    }
+
+    /* For batch query focus */
+    #batch-digits:focus, #batch-refs:focus {
+      border-color: var(--batch-focus-color); /* Blue for batch query */
+    }
+
+    /* Fix for batch select focus (blue outline) */
+    #batch-bank:focus {
+      border-color: var(--batch-select-focus-color); /* Blue border for select */
+    }
+
+    .btn {
+      width: 100%; padding: 0.75rem;
+      font-size: 1rem; font-weight: 600;
+      border: none; border-radius: 6px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn.cbe { background: var(--cbe-color); color: #fff; }
+    .btn.boa { background: var(--boa-color); color: #000; }
+    .btn.batch { background: var(--batch-btn-color); color: #fff; }
+    .btn.batch.active { background: var(--active-color); } /* Blue for batch button active */
+    ul { list-style: none; padding: 0; }
+    #batch-results li { margin-bottom: 0.5rem; }
+    #batch-results a { color: var(--cbe-color); text-decoration: none;
+      transition: color 0.2s;
+    }
+    #batch-results a:hover { color: var(--boa-color); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="lang-switcher">
+      <button class="lang-btn active" id="btn-zh" onclick="setLang('zh')">中</button>
+      <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" id="btn-am" onclick="setLang('am')">አማርኛ</button>
+    </div>
+    <div class="tabs">
+      <div class="tab active" id="cbe-tab" data-bank="cbe" data-zh="CBE 回单" data-en="CBE Slip" data-am="CBE ቅፅ" onclick="showSection('cbe')">CBE 回单</div>
+      <div class="tab" id="boa-tab" data-bank="boa" data-zh="BOA 回单" data-en="BOA Slip" data-am="BOA ቅፅ" onclick="showSection('boa')">BOA 回单</div>
+      <div class="tab" id="batch-tab" data-bank="batch" data-zh="批量查询" data-en="Batch Query" data-am="ብዝሒ መፈለጊያ" onclick="showSection('batch')">批量查询</div>
+    </div>
+    <div class="section active" id="cbe">
+      <div class="input-group">
+        <label data-zh="请输入Reference码：" data-en="Enter Reference code:" data-am="የማጣቀሻ ኮድ ያስገቡ:">请输入Reference码：</label>
+        <input type="text" id="cbe-ref" placeholder="FT24072P5CRR">
+      </div>
+      <div class="input-group">
+        <label id="cbe-label" data-zh="请输入后8位数字：" data-en="Enter last 8 digits:" data-am="ከመጨረሻ 8 ቁጥሮች ያስገቡ:">请输入后8位数字：</label>
+        <input type="text" id="cbe-digits" placeholder="例如：98015038" maxlength="8" oninput="validateCBE()">
+        <span id="cbe-error" style="color: red; display: none;">请输入8位数字</span>
+      </div>
+      <button class="btn cbe" id="cbe-btn" data-zh="查询" data-en="Query" data-am="ፍለጋ" onclick="singleQuery('cbe')">查询</button>
+    </div>
+    <div class="section" id="boa">
+      <div class="input-group">
+        <label data-zh="请输入Reference码：" data-en="Enter Reference code:" data-am="የማጣቀሻ ኮድ ያስገቡ:">请输入Reference码：</label>
+        <input type="text" id="boa-ref" placeholder="FT21208GTTVB">
+      </div>
+      <div class="input-group">
+        <label id="boa-label" data-zh="请输入后5位数字：" data-en="Enter last 5 digits:" data-am="ከመጨረሻ 5 ቁጥሮች ያስገቡ:">请输入后5位数字：</label>
+        <input type="text" id="boa-digits" placeholder="例如：66666" maxlength="5" oninput="validateBOA()">
+        <span id="boa-error" style="color: red; display: none;">请输入5位数字</span>
+      </div>
+      <button class="btn boa" id="boa-btn" data-zh="查询" data-en="Query" data-am="ፍለጋ" onclick="singleQuery('boa')">查询</button>
+    </div>
+    <div class="section" id="batch">
+      <div class="input-group">
+        <label data-zh="请选择银行：" data-en="Select bank:" data-am="ባንክ ይምረጡ:">请选择银行：</label>
+        <select id="batch-bank" onchange="updateDigitLabel()">
+          <option value="cbe" data-zh="CBE" data-en="CBE" data-am="CBE">CBE</option>
+          <option value="boa" data-zh="BOA" data-en="BOA" data-am="BOA">BOA</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label id="batch-digits-label" data-zh="请输入后8位数字：" data-en="Enter last 8 digits:" data-am="ከመጨረሻ 8 ቁጥሮች ያስገቡ:">请输入后8位数字：</label>
+        <input type="text" id="batch-digits" placeholder="例如 8 或 5" maxlength="8" oninput="validateBatch()">
+        <span id="batch-error" style="color: red; display: none;">请输入有效位数的数字！</span>
+      </div>
+      <div class="input-group">
+        <label data-zh="粘贴Reference列表，每行一个：" data-en="Paste references (one per line):" data-am="ማጣቀሻዎችን ያቅርቡ (በአንደኛው መስመር ይዘው):">粘贴Reference列表，每行一个：</label>
+        <textarea id="batch-refs" rows="5" placeholder="FT..."></textarea>
+      </div>
+      <button class="btn batch cbe" id="batch-process" data-zh="数据处理" data-en="Process" data-am="ያስተካክሉ" onclick="batchProcess()">数据处理</button>
+      <button class="btn batch cbe" id="batch-open-all" style="margin-top:1rem; display:none;" data-zh="全部打开" data-en="Open All" data-am="ክፈቱ ሁሉን" onclick="batchOpenAll()">全部打开</button>
+      <div class="input-group" id="search-group" style="display:none; margin-top:1rem;">
+        <label data-zh="搜索：" data-en="Search:" data-am="ፈልግ:">搜索：</label>
+        <input type="text" id="batch-search" placeholder="关键字...">
+      </div>
+      <div id="batch-results" style="margin-top:1rem;"></div>
+    </div>
+  </div>
+
+  <script>
+    // Show corresponding section (CBE, BOA, or Batch)
+    function showSection(id) {
+      document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      
+      document.getElementById(id).classList.add('active');
+      document.getElementById(id + '-tab').classList.add('active');
+    }
+
+    // Validate CBE digits input (must be 8 digits)
+    function validateCBE() {
+      const cbeDigits = document.getElementById('cbe-digits').value;
+      if (cbeDigits.length > 8) {
+        alert('请输入8位数字');
+        document.getElementById('cbe-digits').value = cbeDigits.slice(0, 8);
+      } else if (cbeDigits.length < 8) {
+        document.getElementById('cbe-error').style.display = 'inline';
+      } else {
+        document.getElementById('cbe-error').style.display = 'none';
+      }
+    }
+
+    // Validate BOA digits input (must be 5 digits)
+    function validateBOA() {
+      const boaDigits = document.getElementById('boa-digits').value;
+      if (boaDigits.length > 5) {
+        alert('请输入5位数字');
+        document.getElementById('boa-digits').value = boaDigits.slice(0, 5);
+      } else if (boaDigits.length < 5) {
+        document.getElementById('boa-error').style.display = 'inline';
+      } else {
+        document.getElementById('boa-error').style.display = 'none';
+      }
+    }
+
+    // Validate batch digits input based on selected bank
+    function validateBatch() {
+      const batchDigits = document.getElementById('batch-digits').value;
+      const bank = document.getElementById('batch-bank').value;
+      if (bank === 'cbe' && batchDigits.length > 8) {
+        alert('请输入8位数字');
+        document.getElementById('batch-digits').value = batchDigits.slice(0, 8);
+      }
+      if (bank === 'boa' && batchDigits.length > 5) {
+        alert('请输入5位数字');
+        document.getElementById('batch-digits').value = batchDigits.slice(0, 5);
+      }
+      if (bank === 'cbe' && batchDigits.length < 8) {
+        document.getElementById('batch-error').style.display = 'inline';
+      } else if (bank === 'boa' && batchDigits.length < 5) {
+        document.getElementById('batch-error').style.display = 'inline';
+      } else {
+        document.getElementById('batch-error').style.display = 'none';
+      }
+    }
+
+    // Language switch
+    function setLang(lang) {
+      document.documentElement.setAttribute('data-lang', lang);
+      ['zh','en','am'].forEach(l => document.getElementById('btn-'+l).classList.toggle('active', l===lang));
+      document.querySelectorAll('[data-zh]').forEach(el => {
+        const key = el.getAttribute('data-' + lang);
+        if (key) el.textContent = key;
+      });
+    }
+
+    // Single query logic (CBE / BOA)
+    function singleQuery(bank) {
+      const ref = document.getElementById(bank+'-ref').value.trim();
+      const digits = document.getElementById(bank+'-digits').value.trim();
+      if (!ref || !digits) return alert('请填写完整信息');
+      
+      const url = bank === 'cbe'
+        ? `https://apps.cbe.com.et:100/?id=${ref}${digits}`
+        : `https://cs.bankofabyssinia.com/slip/?trx=${ref}${digits}`;
+      
+      window.open(url, '_blank');
+    }
+
+    // Batch process logic
+    function batchProcess() {
+      const bank = document.getElementById('batch-bank').value;
+      const digits = parseInt(document.getElementById('batch-digits').value.trim(),10);
+      const refs = document.getElementById('batch-refs').value.trim().split(/\r?\n/).filter(r=>r);
+      
+      if (!refs.length || !digits) return alert('请补全信息');
+      
+      let batchLinks = refs.map(ref => {
+        const finalDigits = document.getElementById('batch-digits').value.trim();
+        const url = bank === 'cbe'
+          ? `https://apps.cbe.com.et:100/?id=${ref}${finalDigits}`
+          : `https://cs.bankofabyssinia.com/slip/?trx=${ref}${finalDigits}`;
+        
+        return { ref, url };
+      });
+      
+      renderBatchLinks(batchLinks);
+    }
+
+    // Render batch links
+    function renderBatchLinks(batchLinks) {
+      document.getElementById('batch-open-all').style.display = 'block';
+      document.getElementById('search-group').style.display = 'block';
+      const container = document.getElementById('batch-results');
+      container.innerHTML = '';
+      
+      const ul = document.createElement('ul');
+      batchLinks.forEach(i => { 
+        const li = document.createElement('li'); 
+        li.innerHTML = `<a href="${i.url}" target="_blank">${i.ref}</a>`; 
+        ul.append(li); 
+      });
+      container.append(ul);
+      
+      document.getElementById('batch-search').oninput = e => {
+        const q = e.target.value.toLowerCase();
+        const filtered = batchLinks.filter(i => i.ref.toLowerCase().includes(q));
+        const ul2 = document.createElement('ul');
+        filtered.forEach(i => { 
+          const li = document.createElement('li'); 
+          li.innerHTML = `<a href="${i.url}" target="_blank">${i.ref}</a>`; 
+          ul2.append(li); 
+        });
+        container.innerHTML = '';
+        container.append(ul2);
+      };
+    }
+
+    // Open all batch links
+    function batchOpenAll() {
+      const links = document.querySelectorAll('#batch-results a');
+      links.forEach(link => window.open(link.href, '_blank'));
+    }
+
+    // initialize
+    setLang('zh');
+    updateDigitLabel();
+  </script>
+</body>
+</html>
