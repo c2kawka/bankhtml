@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh" data-lang="zh">
 <head>
@@ -333,10 +334,21 @@
     }
 
     // Open all batch links
-    function batchOpenAll() {
-      const links = document.querySelectorAll('#batch-results a');
-      links.forEach(link => window.open(link.href, '_blank'));
-    }
+    
+function batchOpenAll() {
+  const links = document.querySelectorAll('#batch-results a');
+  let i = 0;
+
+  function openNext() {
+    if (i >= links.length) return;
+    window.open(links[i].href, '_blank');
+    i++;
+    setTimeout(openNext, 500);
+  }
+
+  openNext();
+}
+
 
     // initialize
     setLang('zh');
