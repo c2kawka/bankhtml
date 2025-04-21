@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh" data-lang="zh">
 <head>
@@ -139,7 +138,13 @@
       transition: color 0.2s;
     }
     #batch-results a:hover { color: var(--boa-color); }
-  </style>
+  
+
+input[type="text"], textarea {
+  text-transform: uppercase;
+}
+
+</style>
 </head>
 <body>
   <div class="card">
@@ -196,6 +201,9 @@
       </div>
       <button class="btn batch cbe" id="batch-process" data-zh="数据处理" data-en="Process" data-am="ያስተካክሉ" onclick="batchProcess()">数据处理</button>
       <button class="btn batch cbe" id="batch-open-all" style="margin-top:1rem; display:none;" data-zh="全部打开" data-en="Open All" data-am="ክፈቱ ሁሉን" onclick="batchOpenAll()">全部打开</button>
+      
+<button class="btn batch cbe" id="batch-export" style="margin-top:1rem; display:none;" onclick="exportBatchLinks()">导出链接</button>
+
       <div class="input-group" id="search-group" style="display:none; margin-top:1rem;">
         <label data-zh="搜索：" data-en="Search:" data-am="ፈልግ:">搜索：</label>
         <input type="text" id="batch-search" placeholder="关键字...">
@@ -274,12 +282,13 @@
     // Single query logic (CBE / BOA)
     function singleQuery(bank) {
       const ref = document.getElementById(bank+'-ref').value.trim();
+  const refUpper = ref.toUpperCase();
       const digits = document.getElementById(bank+'-digits').value.trim();
       if (!ref || !digits) return alert('请填写完整信息');
       
       const url = bank === 'cbe'
-        ? `https://apps.cbe.com.et:100/?id=${ref}${digits}`
-        : `https://cs.bankofabyssinia.com/slip/?trx=${ref}${digits}`;
+        ? `https://apps.cbe.com.et:100/?id=${refUpper}${digits}`
+        : `https://cs.bankofabyssinia.com/slip/?trx=${refUpper}${digits}`;
       
       window.open(url, '_blank');
     }
@@ -293,9 +302,10 @@
       if (!refs.length || !digits) return alert('请补全信息');
       
       let batchLinks = refs.map(ref => {
+        const refUpper = ref.toUpperCase();
         const finalDigits = document.getElementById('batch-digits').value.trim();
         const url = bank === 'cbe'
-          ? `https://apps.cbe.com.et:100/?id=${ref}${finalDigits}`
+          ? `https://apps.cbe.com.et:100/?id=${refUpper}${finalDigits}`
           : `https://cs.bankofabyssinia.com/slip/?trx=${ref}${finalDigits}`;
         
         return { ref, url };
@@ -305,8 +315,11 @@
     }
 
     // Render batch links
-    function renderBatchLinks(batchLinks) {
+    let batchLinksGlobal = [];
+function renderBatchLinks(batchLinks) {
+  batchLinksGlobal = batchLinks;
       document.getElementById('batch-open-all').style.display = 'block';
+      document.getElementById('batch-export').style.display = 'block';
       document.getElementById('search-group').style.display = 'block';
       const container = document.getElementById('batch-results');
       container.innerHTML = '';
@@ -314,7 +327,7 @@
       const ul = document.createElement('ul');
       batchLinks.forEach(i => { 
         const li = document.createElement('li'); 
-        li.innerHTML = `<a href="${i.url}" target="_blank">${i.ref}</a>`; 
+        li.innerHTML = `<a href="${i.url}" target="_blank">${i.ref.toUpperCase()}</a>`; 
         ul.append(li); 
       });
       container.append(ul);
@@ -325,7 +338,7 @@
         const ul2 = document.createElement('ul');
         filtered.forEach(i => { 
           const li = document.createElement('li'); 
-          li.innerHTML = `<a href="${i.url}" target="_blank">${i.ref}</a>`; 
+          li.innerHTML = `<a href="${i.url}" target="_blank">${i.ref.toUpperCase()}</a>`; 
           ul2.append(li); 
         });
         container.innerHTML = '';
@@ -334,23 +347,32 @@
     }
 
     // Open all batch links
-    
-function batchOpenAll() {
-  const links = document.querySelectorAll('#batch-results a');
-  let i = 0;
+    function batchOpenAll() {
+      const links = document.querySelectorAll('#batch-results a');
+      links.forEach(link => window.open(link.href, '_blank'));
+    }
 
-  function openNext() {
-    if (i >= links.length) return;
-    window.open(links[i].href, '_blank');
-    i++;
-    setTimeout(openNext, 500);
+    
+function exportBatchLinks() {
+  if (!batchLinksGlobal || !batchLinksGlobal.length) {
+    alert("没有链接可以导出！");
+    return;
   }
 
-  openNext();
+  const content = batchLinksGlobal.map(item => item.url).join("\n");
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "链接列表.txt";
+  a.click();
+
+  URL.revokeObjectURL(url);
 }
 
 
-    // initialize
+// initialize
     setLang('zh');
     updateDigitLabel();
   </script>
