@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link href="https://fonts.googleapis.com/css?family=Inter:400,500,600&display=swap" rel="stylesheet">
-  <script defer data-domain="cbeboacheck.cc" src="https://plausible.io/js/script.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <style>
     :root {
       --cbe-color: #800080;
@@ -22,6 +22,10 @@
       --shadow-light: rgba(0,0,0,0.1);
       --batch-btn-color: #4a90e2;
       --input-focus-color: #ffcc00;
+      --exchange-btn-color: #28a745;
+      --loading-color: #ffc107;
+      --success-color: #28a745;
+      --error-color: #dc3545;
     }
     * { box-sizing: border-box; margin:0; padding:0 }
     body {
@@ -60,6 +64,7 @@
     }
     .tab.active { color: var(--cbe-color); }
     .tab[data-bank="boa"].active { color: var(--boa-color); }
+    .tab[data-bank="exchange"].active { color: var(--exchange-btn-color); }
     .tab.active::after {
       content:''; position:absolute; bottom:0; left:50%;
       transform:translateX(-50%); width:50px; height:3px;
@@ -98,10 +103,8 @@
     .btn.cbe { background:var(--cbe-color); color:#fff; }
     .btn.boa { background:var(--boa-color); color:#000; }
     .btn.batch { background:var(--batch-btn-color); color:#fff; }
-    /* 强制大写显示 */
+    .btn.exchange { background:var(--exchange-btn-color); color:#fff; }
     input[type="text"], textarea { text-transform: uppercase; }
-
-    /* 渐变文字 & hover */
     #batch-results a {
       font-weight:bold;
       background:linear-gradient(to right,#800080,#d16ba5);
@@ -112,8 +115,57 @@
     #batch-results a:hover {
       -webkit-text-fill-color:#d16ba5;
     }
-
-    /* 移动端适配 */
+    #exchange-rate-display { 
+      margin-top: 1.5rem; 
+    }
+    #exchange-rate-display p {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    #exchange-rate-display table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card-bg);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #exchange-rate-display th, #exchange-rate-display td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    #exchange-rate-display th {
+      background-color: var(--input-bg);
+      font-weight: 600;
+    }
+    #exchange-rate-display td {
+      font-size: 0.95rem;
+    }
+    .status-message {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.95rem;
+    }
+    .status-message i {
+      font-size: 1.2rem;
+    }
+    .loading { 
+      background-color: var(--loading-color); 
+      color: #fff; 
+    }
+    .success { 
+      background-color: var(--success-color); 
+      color: #fff; 
+    }
+    .error { 
+      background-color: var(--error-color); 
+      color: #fff; 
+    }
     @media (max-width:600px){
       body {padding:1rem;align-items:stretch}
       .card {width:100%;border-radius:0;box-shadow:none}
@@ -139,6 +191,9 @@
       <div class="tab" id="batch-tab" data-bank="batch"
            data-zh="批量查询" data-en="Batch Query" data-am="ብዝሒ መፈለጊያ"
            onclick="showSection('batch')">批量查询</div>
+      <div class="tab" id="exchange-tab" data-bank="exchange"
+           data-zh="汇率查询" data-en="Exchange Rate" data-am="የምንዛሪ ተመን"
+           onclick="showSection('exchange')">汇率查询</div>
     </div>
 
     <!-- CBE 单查 -->
@@ -242,6 +297,20 @@
                oninput="filterBatch()">
       </div>
       <div id="batch-results" style="margin-top:1rem"></div>
+    </div>
+
+    <!-- 汇率查询 -->
+    <div class="section" id="exchange">
+      <div class="input-group">
+        <label data-zh="请选择日期：" data-en="Select Date:" data-am="ቀን ይምረጡ:">
+          请选择日期：
+        </label>
+        <input type="date" id="exchange-date">
+      </div>
+      <button class="btn exchange" onclick="queryExchangeRate()"
+              data-zh="查询汇率" data-en="Query Rate" data-am="ተመን ፈልግ">查询汇率</button>
+      <div id="status-message" class="status-message" style="display:none;"></div>
+      <div id="exchange-rate-display"></div>
     </div>
   </div>
 
@@ -397,6 +466,75 @@
         ul.append(li);
       });
       c.append(ul);
+    }
+
+    // 汇率查询
+    function queryExchangeRate() {
+      const date = document.getElementById('exchange-date').value;
+      if (!date) return alert('请选择一个日期');
+
+      const statusMessage = document.getElementById('status-message');
+      const display = document.getElementById('exchange-rate-display');
+
+      statusMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 加载中...';
+      statusMessage.className = 'status-message loading';
+      statusMessage.style.display = 'flex';
+      display.innerHTML = '';
+
+      const apiUrl = `https://combanketh.et/cbeapi/daily-exchange-rates/?_limit=1&Date=${date}&csrt=8749569708786479517`;
+      fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+          statusMessage.style.display = 'none';
+          if (data && data.length > 0) {
+            const rates = data[0].ExchangeRate.filter(rate => 
+              rate.currency.CurrencyCode === 'USD' || rate.currency.CurrencyCode === 'CNY'
+            );
+            if (rates.length > 0) {
+              display.innerHTML = `
+                <p>日期: ${data[0].Date}</p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>货币</th>
+                      <th>现金买入</th>
+                      <th>现金卖出</th>
+                      <th>交易买入</th>
+                      <th>交易卖出</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rates.map(rate => `
+                      <tr>
+                        <td>${rate.currency.CurrencyName}</td>
+                        <td>${rate.cashBuying}</td>
+                        <td>${rate.cashSelling}</td>
+                        <td>${rate.transactionalBuying}</td>
+                        <td>${rate.transactionalSelling}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              `;
+              statusMessage.innerHTML = '<i class="fas fa-check-circle"></i> 查询成功';
+              statusMessage.className = 'status-message success';
+              statusMessage.style.display = 'flex';
+            } else {
+              statusMessage.innerHTML = '<i class="fas fa-exclamation-circle"></i> 所选日期无 USD 或 CNY 汇率数据';
+              statusMessage.className = 'status-message error';
+              statusMessage.style.display = 'flex';
+            }
+          } else {
+            statusMessage.innerHTML = '<i class="fas fa-exclamation-circle"></i> 所选日期无汇率数据';
+            statusMessage.className = 'status-message error';
+            statusMessage.style.display = 'flex';
+          }
+        })
+        .catch(err => {
+          statusMessage.innerHTML = '<i class="fas fa-times-circle"></i> 获取数据失败，请稍后重试';
+          statusMessage.className = 'status-message error';
+          statusMessage.style.display = 'flex';
+        });
     }
 
     // 初始化
